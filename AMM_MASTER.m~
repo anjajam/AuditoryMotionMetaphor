@@ -10,10 +10,8 @@ subjDirs = listdir(dataDir,'dirs');
 SUBJECTS_DIR = getenv('SUBJECT_DIR');
 shellScriptDir = '/data/jag/ajamrozik/clusterscripts/AMMet/reconallScripts';
 if ~exist(shellScriptDir,'dir')
-    mkdir(shellScriptDir);
+   mkd 
 end
-logDir = '/data/jag/ajamrozik/LOGS';
-mem = 20; % memory for reconall
 %% Sort the dicoms and convert to nifti
 
 %%%% add these scripts %%%%
@@ -27,24 +25,13 @@ for i = 1:length(subjDirs)
         % make a recon-all shell script
         inAnat = fullfile(dataDir,subjDirs{i},sessDir{1},'MPRAGE/001/ACPC/MPRAGE.ACPC.nii.gz');
         reconallText = ['recon-all -i ' inAnat ' -s ' sessDir{1} ' -all'];
-        fname = fullfile(shellScriptDir,[sessDir{1} '_reconall.sh']);
+        fname = fullfile(outDir,[job_name '_anatomical.sh']);
         fid = fopen(fname,'w');
-        fprintf(fid,reconallText);
+        fprintf(fid,['matlab -nodisplay -nosplash -r ' matlab_string])
         fclose(fid);
     end
 end
-% make submit script
-allScripts = listdir(shellScriptDir,'files');
-fname = fullfile(shellScriptDir,'submit_reconall.sh');
-fid = fopen(fname,'w');
-for i = 1:length(allScripts);
-fprintf(fid,['qsub -l h_vmem=' num2str(mem) ...
-    '.2G,s_vmem=' num2str(mem) 'G -e ' logDir ' -o ' logDir ' ' ...
-    fullfile(shellScriptDir,allScripts{i}) '\n']);
-end
-fclose(fid);
-
-%%% The above will make shell scripts and a 'submit' script. Run the 'submit' script from chead %%%
+% make a submit script
 
 %% Anything else we did
 
