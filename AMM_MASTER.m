@@ -20,10 +20,10 @@ mem = 20; % memory for reconall
 
 %% Run Freesurfer's recon-all
 % We ran some of the subjects already, so we just want to run the remained
-fsSubs = listdir(SUBJECTS_DIR,'dir');
+fsSubs = listdir(SUBJECTS_DIR,'dirs');
 for i = 1:length(subjDirs)
-    if ~ismember(subjDirs{i},fsSubs)
-        sessDir = listdir(subDir{i},'dirs');
+    sessDir = listdir(fullfile(dataDir,subjDirs{i}),'dirs');
+    if ~ismember(sessDir,fsSubs)
         % make a recon-all shell script
         inAnat = fullfile(dataDir,subjDirs{i},sessDir{1},'MPRAGE/001/ACPC/MPRAGE.ACPC.nii.gz');
         reconallText = ['recon-all -i ' inAnat ' -s ' sessDir{1} ' -all'];
@@ -64,5 +64,3 @@ for i = 1:length(subjDirs)
     
     bbregister(subject_name,filefor_reg,bbreg_out_file,acq_type);
 end
-
-
