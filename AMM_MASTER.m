@@ -7,7 +7,7 @@
 %% Set up initial variables
 dataDir = '/data/jag/ajamrozik/Data/AMMet/';
 subjDirs = listdir(dataDir,'dirs');
-SUBJECTS_DIR = getenv('SUBJECT_DIR');
+SUBJECTS_DIR = getenv('SUBJECTS_DIR');
 shellScriptDir = '/data/jag/ajamrozik/clusterscripts/AMMet/reconallScripts';
 if ~exist(shellScriptDir,'dir')
     mkdir(shellScriptDir);
