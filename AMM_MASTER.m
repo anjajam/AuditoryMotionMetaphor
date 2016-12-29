@@ -55,12 +55,16 @@ fclose(fid);
 
 %%% feat stuff %%%
 
-%% Register the functional data to the freesurfer anatomical data
-% Use Freesurfer's 'bbregister' function
-
-for i = 1:length(subjDirs)
-    subDir = fullfile(dataDir,subjDirs{i});
-    sessDir = listdir(subDir,'dirs');
-    
-    bbregister(subject_name,filefor_reg,bbreg_out_file,acq_type);
+%% Register functional runs to Freesurfer anatomical
+for i = 10:length(subjDirs)
+    tDir = listdir(fullfile(dataDir,subjDirs{i}),'dirs');
+    sessionDir = fullfile(dataDir,subjDirs{i},tDir{1});
+    [~,subject_name] = fileparts(sessionDir);
+    boldDirs = find_bold(sessionDir);
+    for j = 1:length(boldDirs)
+        featDirs = listdir(fullfile(sessionDir,boldDirs{j},'*.feat'),'dirs');
+        regFile = fullfile(sessionDir,boldDirs{j},featDirs{end},'mean_func.nii.gz');
+        bbreg_out_file = fullfile(sessionDir,boldDirs{j},'func_bbreg.dat');
+        bbregister(subject_name,regFile,bbreg_out_file,'t2');
+    end
 end
