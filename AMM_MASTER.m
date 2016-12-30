@@ -38,9 +38,9 @@ allScripts = listdir(shellScriptDir,'files');
 fname = fullfile(shellScriptDir,'submit_reconall.sh');
 fid = fopen(fname,'w');
 for i = 1:length(allScripts);
-fprintf(fid,['qsub -l h_vmem=' num2str(mem) ...
-    '.2G,s_vmem=' num2str(mem) 'G -e ' logDir ' -o ' logDir ' ' ...
-    fullfile(shellScriptDir,allScripts{i}) '\n']);
+    fprintf(fid,['qsub -l h_vmem=' num2str(mem) ...
+        '.2G,s_vmem=' num2str(mem) 'G -e ' logDir ' -o ' logDir ' ' ...
+        fullfile(shellScriptDir,allScripts{i}) '\n']);
 end
 fclose(fid);
 
@@ -56,7 +56,7 @@ fclose(fid);
 %%% feat stuff %%%
 
 %% Register functional runs to Freesurfer anatomical
-for i = 10:length(subjDirs)
+for i = 1:length(subjDirs)
     tDir = listdir(fullfile(dataDir,subjDirs{i}),'dirs');
     sessionDir = fullfile(dataDir,subjDirs{i},tDir{1});
     [~,subject_name] = fileparts(sessionDir);
@@ -66,5 +66,50 @@ for i = 10:length(subjDirs)
         regFile = fullfile(sessionDir,boldDirs{j},featDirs{end},'mean_func.nii.gz');
         bbreg_out_file = fullfile(sessionDir,boldDirs{j},'func_bbreg.dat');
         bbregister(subject_name,regFile,bbreg_out_file,'t2');
+    end
+end
+%% Check the results of bbregister
+for i = 1:length(subjDirs)
+    tDir = listdir(fullfile(dataDir,subjDirs{i}),'dirs');
+    sessionDir = fullfile(dataDir,subjDirs{i},tDir{1});
+    boldDirs = find_bold(sessionDir);
+    for j = 1:length(boldDirs)
+        minFile = fullfile(sessionDir,boldDirs{j},'func_bbreg.dat.mincost');
+        if exist(minFile,'file')
+            tmp = load(minFile);
+            if tmp(1) > 0.7
+                disp([fullfile(sessionDir,boldDirs{j}) ' > 0.7']);
+            end
+        else
+            disp([minFile ' doesn''t exist!']);
+        end
+    end
+end
+%% Project stats to surface
+for i = 1:length(subjDirs)
+    tDir = listdir(fullfile(dataDir,subjDirs{i}),'dirs');
+    sessionDir = fullfile(dataDir,subjDirs{i},tDir{1});
+    boldDirs = find_bold(sessionDir);
+    for j = 1:length(boldDirs)
+        featDirs = listdir(fullfile(sessionDir,boldDirs{j},'*.feat'),'dirs');
+        bbreg_out_file = fullfile(sessionDir,boldDirs{j},'func_bbreg.dat');
+        if exist(bbreg_out_file,'file')
+            for k = 1:length(featDirs)
+                statDir = fullfile(sessionDir,boldDirs{j},featDirs{k},'stats');
+                statFiles = listdir(fullfile(statDir,'zstat*.nii.gz'),'files');
+                for l = 1:length(statFiles)
+                    tmp = strfind(statFiles{l},'.nii.gz');
+                    baseName = statFiles{l}(1:(tmp-1));
+                    % left hemisphere
+                    system(['mri_vol2surf --mov ' ...
+                        fullfile(statDir,statFiles{l}) ' --reg ' bbreg_out_file ...
+                        ' --hemi lh --o ' fullfile(statDir,[baseName '.surf.lh.nii.gz'])]);
+                    % right hemisphere
+                    system(['mri_vol2surf --mov ' ...
+                        fullfile(statDir,statFiles{l}) ' --reg ' bbreg_out_file ...
+                        ' --hemi rh --o ' fullfile(statDir,[baseName '.surf.rh.nii.gz'])]);
+                end
+            end
+        end
     end
 end
