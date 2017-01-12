@@ -96,6 +96,7 @@ for i = 1:length(subjDirs)
         if exist(bbreg_out_file,'file')
             for k = 1:length(featDirs)
                 statDir = fullfile(sessionDir,boldDirs{j},featDirs{k},'stats');
+                system(['rm ' fullfile(statDir,'*surf*.nii.gz')]);
                 statFiles = listdir(fullfile(statDir,'zstat*.nii.gz'),'files');
                 for l = 1:length(statFiles)
                     tmp = strfind(statFiles{l},'.nii.gz');
@@ -112,4 +113,62 @@ for i = 1:length(subjDirs)
             end
         end
     end
+end
+%% Project Heschl's Gyrus ROIs (FSL) to subject space
+for i = 1:length(subjDirs)
+    tDir = listdir(fullfile(dataDir,subjDirs{i}),'dirs');
+    sessionDir = fullfile(dataDir,subjDirs{i},tDir{1});
+    [~,subject_name] = fileparts(sessionDir);
+    subjDir = fullfile(SUBJECTS_DIR,subject_name);
+    if exist(subjDir,'dir')
+        % left hemisphere
+        sval = '/data/jag/ajamrozik/Data/fsaverageROIs/HeschlsGyrus.surf.lh.nii.gz';
+        tval = fullfile(SUBJECTS_DIR,subject_name,'label','HeschlsGyrus.surf.lh.nii.gz');
+        mri_surf2surf('fsaverage',subject_name,sval,tval,'lh');
+        % right hemisphere
+        sval = '/data/jag/ajamrozik/Data/fsaverageROIs/HeschlsGyrus.surf.rh.nii.gz';
+        tval = fullfile(SUBJECTS_DIR,subject_name,'label','HeschlsGyrus.surf.rh.nii.gz');
+        mri_surf2surf('fsaverage',subject_name,sval,tval,'rh');
+    end
+end
+%% Make the cross-correlation matrices
+for i = 1:length(subjDirs)
+    % Get the ROI vertices
+    roiInds = [];
+    tDir = listdir(fullfile(dataDir,subjDirs{i}),'dirs');
+    sessionDir = fullfile(dataDir,subjDirs{i},tDir{1});
+    [~,subject_name] = fileparts(sessionDir);
+    subjDir = fullfile(SUBJECTS_DIR,subject_name);
+    if exist(subjDir,'dir')
+        % Primary auditory
+        tmp = load_nifti(fullfile(SUBJECTS_DIR,subject_name,'label',...
+            'HeschlsGyrus.surf.lh.nii.gz'));
+        roiInds{1,1} = find(tmp.vol > 5); % > 5% probability
+        tmp = load_nifti(fullfile(SUBJECTS_DIR,subject_name,'label',...
+            'HeschlsGyrus.surf.rh.nii.gz'));
+        roiInds{1,2} = find(tmp.vol > 5); % > 5% probability
+        save(fullfile(sessionDir,'roiInds.mat'),'roiInds');
+        % Primary motor
+        tmp1 = read_label(subject_name,'lh.BA4a');
+        tmp2 = read_label(subject_name,'lh.BA4p');
+        roiInds{2,1} = [tmp1(:,1) + 1;tmp2(:,1) + 1]; % 0 based index
+        tmp1 = read_label(subject_name,'rh.BA4a');
+        tmp2 = read_label(subject_name,'rh.BA4p');
+        roiInds{2,2} = [tmp1(:,1) + 1;tmp2(:,1) + 1]; % 0 based index
+        % MT
+        tmp = read_label(subject_name,'lh.MT');
+        roiInds{3,1} = tmp(:,1) + 1; % 0 based index
+        tmp = read_label(subject_name,'rh.MT');
+        roiInds{3,2} = tmp(:,1) + 1; % 0 based index
+    end
+    
+    % Correlate each sentence run with the auditory and video runs
+    metDirs = listdir(fullfile(sessionDir,'*BOLD_MET*'),'dirs');
+    soundDir = listdir(fullfile(sessionDir,'*BOLD_SOUND'),'dirs');
+    videoDir = listdir(fullfile(sessionDir,'*BOLD_VIDEO'),'dirs');
+    for j = 1:length(metDirs)
+        featDirs = listdir(fullfile(sessionDir,metDirs{j},'*.feat'),'dirs');
+        
+    end
+    
 end
