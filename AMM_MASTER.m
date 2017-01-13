@@ -248,7 +248,7 @@ for i = 1:length(subjDirs)
                         lhMet.vol(lhAudVerts),lhSound.vol(lhAudVerts));
                     labels = '';
                     labels = [labels ' ' ...
-                        sprintf('run%02d_sentence%02d_sound%02d_lhAud_',j,k,l)];
+                        sprintf('run%02d_sentence%02d_sound%02d_lhAud',j,k,l)];
                     ct = ct + 1;
                     corrVals(i,ct) = corr(...
                         rhMet.vol(rhAudVerts),rhSound.vol(rhAudVerts));
