@@ -97,6 +97,7 @@ for i = 1:length(subjDirs)
             for k = 1:length(featDirs)
                 statDir = fullfile(sessionDir,boldDirs{j},featDirs{k},'stats');
                 system(['rm ' fullfile(statDir,'*surf*.nii.gz')]);
+                % z-stats
                 statFiles = listdir(fullfile(statDir,'zstat*.nii.gz'),'files');
                 for l = 1:length(statFiles)
                     tmp = strfind(statFiles{l},'.nii.gz');
@@ -109,6 +110,22 @@ for i = 1:length(subjDirs)
                     system(['mri_vol2surf --mov ' ...
                         fullfile(statDir,statFiles{l}) ' --reg ' bbreg_out_file ...
                         ' --hemi rh --o ' fullfile(statDir,[baseName '.surf.rh.nii.gz'])]);
+                end
+                % f-stat
+                fstatFiles = listdir(fullfile(statDir,'zfstat*.nii.gz'),'files');
+                if ~isempty(fstatFiles)
+                    for l = 1:length(fstatFiles)
+                        tmp = strfind(fstatFiles{l},'.nii.gz');
+                        baseName = fstatFiles{l}(1:(tmp-1));
+                        % left hemisphere
+                        system(['mri_vol2surf --mov ' ...
+                            fullfile(statDir,fstatFiles{l}) ' --reg ' bbreg_out_file ...
+                            ' --hemi lh --o ' fullfile(statDir,[baseName '.surf.lh.nii.gz'])]);
+                        % right hemisphere
+                        system(['mri_vol2surf --mov ' ...
+                            fullfile(statDir,fstatFiles{l}) ' --reg ' bbreg_out_file ...
+                            ' --hemi rh --o ' fullfile(statDir,[baseName '.surf.rh.nii.gz'])]);
+                    end
                 end
             end
         end
@@ -134,41 +151,121 @@ end
 %% Make the cross-correlation matrices
 for i = 1:length(subjDirs)
     % Get the ROI vertices
-    roiInds = [];
     tDir = listdir(fullfile(dataDir,subjDirs{i}),'dirs');
     sessionDir = fullfile(dataDir,subjDirs{i},tDir{1});
     [~,subject_name] = fileparts(sessionDir);
     subjDir = fullfile(SUBJECTS_DIR,subject_name);
     if exist(subjDir,'dir')
         % Primary auditory
-        tmp = load_nifti(fullfile(SUBJECTS_DIR,subject_name,'label',...
-            'HeschlsGyrus.surf.lh.nii.gz'));
-        roiInds{1,1} = find(tmp.vol > 5); % > 5% probability
-        tmp = load_nifti(fullfile(SUBJECTS_DIR,subject_name,'label',...
-            'HeschlsGyrus.surf.rh.nii.gz'));
-        roiInds{1,2} = find(tmp.vol > 5); % > 5% probability
-        save(fullfile(sessionDir,'roiInds.mat'),'roiInds');
-        % Primary motor
-        tmp1 = read_label(subject_name,'lh.BA4a');
-        tmp2 = read_label(subject_name,'lh.BA4p');
-        roiInds{2,1} = [tmp1(:,1) + 1;tmp2(:,1) + 1]; % 0 based index
-        tmp1 = read_label(subject_name,'rh.BA4a');
-        tmp2 = read_label(subject_name,'rh.BA4p');
-        roiInds{2,2} = [tmp1(:,1) + 1;tmp2(:,1) + 1]; % 0 based index
-        % MT
-        tmp = read_label(subject_name,'lh.MT');
-        roiInds{3,1} = tmp(:,1) + 1; % 0 based index
-        tmp = read_label(subject_name,'rh.MT');
-        roiInds{3,2} = tmp(:,1) + 1; % 0 based index
-    end
-    
-    % Correlate each sentence run with the auditory and video runs
-    metDirs = listdir(fullfile(sessionDir,'*BOLD_MET*'),'dirs');
-    soundDir = listdir(fullfile(sessionDir,'*BOLD_SOUND'),'dirs');
-    videoDir = listdir(fullfile(sessionDir,'*BOLD_VIDEO'),'dirs');
-    for j = 1:length(metDirs)
-        featDirs = listdir(fullfile(sessionDir,metDirs{j},'*.feat'),'dirs');
+        locAudDir = listdir(fullfile(sessionDir,'*BOLD_LOCAUD'),'dirs');
         
+        lhH = load_nifti(fullfile(SUBJECTS_DIR,subject_name,'label',...
+            'HeschlsGyrus.surf.lh.nii.gz'));
+        lhAud = load_nifti(fullfile(sessionDir,locAudDir{1},'OUTPUT.feat','stats',...
+            'zstat1.surf.lh.nii.gz'));
+        lhAudQ = quantile(lhAud.vol,0.9);
+        lhAudVerts = find(lhH.vol > 5 & lhAud.vol > lhAudQ); % > 5% probability
+        
+        rhH = load_nifti(fullfile(SUBJECTS_DIR,subject_name,'label',...
+            'HeschlsGyrus.surf.rh.nii.gz'));
+        rhAud = load_nifti(fullfile(sessionDir,locAudDir{1},'OUTPUT.feat','stats',...
+            'zstat1.surf.rh.nii.gz'));
+        rhAudQ = quantile(rhAud.vol,0.9);
+        rhAudVerts = find(rhH.vol > 5 & rhAud.vol > rhAudQ); % > 5% probability
+        
+        % Primary motor
+        locMotDir = listdir(fullfile(sessionDir,'*BOLD_LOCMOTOR'),'dirs');
+        
+        lhM1 = read_label(subject_name,'lh.BA4a');
+        lhM2 = read_label(subject_name,'lh.BA4p');
+        lhM = [lhM1(:,1) + 1;lhM2(:,1) + 1]; % add 1 to 0-based index
+        lhMot = load_nifti(fullfile(sessionDir,locMotDir{1},'OUTPUT.feat','stats',...
+            'zfstat1.surf.lh.nii.gz'));
+        lhMotQ = quantile(lhMot.vol,0.9);
+        lhMotVerts = find(lhMot.vol > lhMotQ & ismember(1:length(lhMot.vol),lhM));
+        
+        rhM1 = read_label(subject_name,'rh.BA4a');
+        rhM2 = read_label(subject_name,'rh.BA4p');
+        rhM = [rhM1(:,1) + 1;rhM2(:,1) + 1]; % add 1 to 0-based index
+        rhMot = load_nifti(fullfile(sessionDir,locMotDir{1},'OUTPUT.feat','stats',...
+            'zfstat1.surf.rh.nii.gz'));
+        rhMotQ = quantile(rhMot.vol,0.9);
+        rhMotVerts = find(rhMot.vol > rhMotQ & ismember(1:length(rhMot.vol),rhM));
+        
+        % MT
+        locVisMotDir = listdir(fullfile(sessionDir,'*BOLD_LOCVISMOT'),'dirs');
+        
+        lhMT1 = read_label(subject_name,'lh.MT');
+        lhMTv = lhMT1(:,1) + 1; % add 1 to 0-based index
+        lhMT = load_nifti(fullfile(sessionDir,locVisMotDir{1},'OUTPUT.feat','stats',...
+            'zstat3.surf.lh.nii.gz'));
+        lhMTQ = quantile(lhMT.vol,0.9);
+        lhMTVerts = find(lhMT.vol > lhMTQ & ismember(1:length(lhMT.vol),lhMTv));
+        
+        rhMT1 = read_label(subject_name,'rh.MT');
+        rhMTv = rhMT1(:,1) + 1; % add 1 to 0-based index
+        rhMT = load_nifti(fullfile(sessionDir,locVisMotDir{1},'OUTPUT.feat','stats',...
+            'zstat3.surf.rh.nii.gz'));
+        rhMTQ = quantile(rhMT.vol,0.9);
+        rhMTVerts = find(rhMT.vol > rhMTQ & ismember(1:length(rhMT.vol),rhMTv));
+        
+        % Correlate each sentence run with the auditory and video runs
+        metDirs = listdir(fullfile(sessionDir,'*BOLD_MET*'),'dirs');
+        
+        soundDir = listdir(fullfile(sessionDir,'*BOLD_SOUND'),'dirs');
+        lhSoundStats = listdir(fullfile(sessionDir,soundDir{1},'OUTPUT.feat','stats',...
+            'zstat*.surf.lh.nii.gz'),'files');
+        rhSoundStats = listdir(fullfile(sessionDir,soundDir{1},'OUTPUT.feat','stats',...
+            'zstat*.surf.rh.nii.gz'),'files');
+        
+        videoDir = listdir(fullfile(sessionDir,'*BOLD_VIDEO'),'dirs');
+        lhVideoStats = listdir(fullfile(sessionDir,videoDir{1},'OUTPUT.feat','stats',...
+            'zstat*.surf.lh.nii.gz'),'files');
+        rhVideoStats = listdir(fullfile(sessionDir,videoDir{1},'OUTPUT.feat','stats',...
+            'zstat*.surf.rh.nii.gz'),'files');
+        
+        for j = 1:length(metDirs)
+            indivDir = listdir(fullfile(sessionDir,metDirs{j},'*INDIV.feat'),'dirs');
+            lhzstats = listdir(fullfile(sessionDir,metDirs{j},indivDir{1},...
+                'zstat*.surf.lh.nii.gz'),'files');
+            rhzstats = listdir(fullfile(sessionDir,metDirs{j},indivDir{1},...
+                'zstat*.surf.rh.nii.gz'),'files');
+            for k = 1:length(lhzstats)
+                lhMet = load_nifti(fullfile(sessionDir,metDirs{j},indivDir{1},...
+                    lhzstats{k}));
+                rhMet = load_nifti(fullfile(sessionDir,metDirs{j},indivDir{1},...
+                    rhzstats{k}));
+                % Sound
+                for l = 1:length(lhSoundStats)
+                    lhSound = load_nifti(fullfile(sessionDir,soundDir{1},...
+                        'OUTPUT.feat','stats',lhSoundStats{l}));
+                    rhSound = load_nifti(fullfile(sessionDir,soundDir{1},...
+                        'OUTPUT.feat','stats',rhSoundStats{l}));
+                    lhlhCorrVals = corr(...
+                        lhMet.vol(lhAudVerts),lhSound.vol(lhAudVerts));
+                    lhrhCorrVals = corr(...
+                        lhMet.vol(lhAudVerts),rhSound.vol(rhAudVerts));
+                    rhlhCorrVals = corr(...
+                        rhMet.vol(rhAudVerts),lhSound.vol(lhAudVerts));
+                    rhrhCorrVals = corr(...
+                        rhMet.vol(rhAudVerts),rhSound.vol(rhAudVerts));
+                end
+                % Video
+                for l = 1:length(lhVideoStats)
+                    lhSound = load_nifti(fullfile(sessionDir,soundDir{1},...
+                        'OUTPUT.feat','stats',lhSoundStats{l}));
+                    rhSound = load_nifti(fullfile(sessionDir,soundDir{1},...
+                        'OUTPUT.feat','stats',rhSoundStats{l}));
+                    lhlhCorrVals = corr(...
+                        lhMet.vol(lhAudVerts),lhSound.vol(lhAudVerts));
+                    lhrhCorrVals = corr(...
+                        lhMet.vol(lhAudVerts),rhSound.vol(rhAudVerts));
+                    rhlhCorrVals = corr(...
+                        rhMet.vol(rhAudVerts),lhSound.vol(lhAudVerts));
+                    rhrhCorrVals = corr(...
+                        rhMet.vol(rhAudVerts),rhSound.vol(rhAudVerts));
+                end
+            end
+        end
     end
-    
 end
